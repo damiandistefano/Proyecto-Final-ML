@@ -72,7 +72,11 @@ class DataProcessor:
 
         # # 8. Agregar columnas codificadas
         # df_clean = pd.concat([df_clean, df_encoded], axis=1)
-
+        df_clean.loc[df_clean["Marca"] == "Hiunday", "Marca"] = "Hyundai"
+        df_clean.loc[df_clean["Marca"] == "hiunday", "Marca"] = "Hyundai"
+        df_clean.loc[df_clean["Marca"] == "Rrenault", "Marca"] = "Renault"
+        df_clean.loc[df_clean["Marca"] == "Jetur", "Marca"] = "Jetour"
+        df_clean.loc[df_clean["Marca"] == "Vol", "Marca"] = "Volvo"
         # Cilindrada en ves de motor
         df_clean['Cilindrada'] = df_clean['Motor'].str.extract(r'(\d\.\d)').astype(float)
         df_clean = df_clean.drop(columns=["Motor"], errors="ignore")
