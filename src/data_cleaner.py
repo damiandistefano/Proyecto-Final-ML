@@ -34,32 +34,34 @@ class DataProcessor:
             .astype(float)
         )
 
-        # # 6. One-hot encoding (manual)
-        # def one_hot_encode(df, column):
-        #     unique_values = df[column].unique()
-        #     one_hot = np.zeros((df.shape[0], len(unique_values)), dtype=float)
-        #     value_to_index = {val: i for i, val in enumerate(unique_values)}
-        #     for i, val in enumerate(df[column]):
-        #         one_hot[i, value_to_index[val]] = 1
-        #     col_names = [f"{column}_{val}" for val in unique_values]
-        #     one_hot_df = pd.DataFrame(one_hot, columns=col_names, index=df.index)
-        #     return one_hot_df
+        # 6. One-hot encoding (manual)
+        def one_hot_encode(df, column):
+            unique_values = df[column].unique()
+            one_hot = np.zeros((df.shape[0], len(unique_values)), dtype=float)
+            value_to_index = {val: i for i, val in enumerate(unique_values)}
+            for i, val in enumerate(df[column]):
+                one_hot[i, value_to_index[val]] = 1
+            col_names = [f"{column}_{val}" for val in unique_values]
+            one_hot_df = pd.DataFrame(one_hot, columns=col_names, index=df.index)
+            return one_hot_df
 
-        # columns_to_encode = [
-        #     "Marca", "Modelo", "Color", "Tipo de combustible",
-        #     "Transmisión", "Motor", "Tipo de carrocería",
-        #     "Con cámara de retroceso", "Tipo de vendedor"
-        # ]
-        # for col in columns_to_encode:
-        #     print(f"{col}: {df[col].nunique()} categorías")
+        columns_to_encode = ["Marca", "Modelo"]
 
+        encoded_parts = []
+        for col in columns_to_encode:
+            if col in df_clean.columns:
+                print(f"{col}: {df_clean[col].nunique()} categorías")
+                encoded = one_hot_encode(df_clean, col)
+                encoded_parts.append(encoded)
 
-        # encoded_parts = []
-        # for col in columns_to_encode:
-        #     if col in df_clean.columns:
-        #         encoded_parts.append(one_hot_encode(df_clean, col))
+        # Concatenamos las columnas one-hot al dataset
+        if encoded_parts:
+            df_encoded = pd.concat(encoded_parts, axis=1)
+            df_clean = pd.concat([df_clean, df_encoded], axis=1)
 
-        # df_encoded = pd.concat(encoded_parts, axis=1) if encoded_parts else pd.DataFrame(index=df_clean.index)
+        # Eliminamos las columnas originales categóricas
+        df_clean = df_clean.drop(columns=columns_to_encode, errors="ignore")
+        encoded = pd.concat(encoded_parts, axis=1) if encoded_parts else pd.DataFrame(index=df_clean.index)
 
         # features poco influyentes
         df_clean = df_clean.drop(columns=["Color", "Con cámara de retroceso","Versión"], errors="ignore")
@@ -105,19 +107,19 @@ class DataProcessor:
         df_clean.drop(columns=["Tipo de combustible", "Tipo de combustible agrupado"], inplace=True)
 
         # Marcas
-        alta = {"BMW", "Mercedes-Benz", "Audi", "Lexus", "Volvo", "Land Rover"}
-        media = {"Toyota", "Honda", "Volkswagen", "Hyundai", "Nissan", "Chevrolet", "Ford", "Renault"}
-        baja = {"Fiat", "Chery", "Peugeot", "Jetour", "JAC", "Lifan"}
+        # alta = {"BMW", "Mercedes-Benz", "Audi", "Lexus", "Volvo", "Land Rover"}
+        # media = {"Toyota", "Honda", "Volkswagen", "Hyundai", "Nissan", "Chevrolet", "Ford", "Renault"}
+        # baja = {"Fiat", "Chery", "Peugeot", "Jetour", "JAC", "Lifan"}
 
-        def clasificar_marca(marca):
-            if marca in alta:
-                return "alta"
-            elif marca in media:
-                return "media"
-            else:
-                return "baja"
+        # def clasificar_marca(marca):
+        #     if marca in alta:
+        #         return "alta"
+        #     elif marca in media:
+        #         return "media"
+        #     else:
+        #         return "baja"
 
-        df["Gama_marca"] = df["Marca"].apply(clasificar_marca)
+        # df["Gama_marca"] = df["Marca"].apply(clasificar_marca)
 
 
 
