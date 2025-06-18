@@ -2,8 +2,9 @@ import numpy as np
 
 class LinearReg:
     def __init__(self, X, y, l1=0, l2=0):
-        self.X = np.column_stack((np.ones(X.shape[0]), X))
-        self.y = np.array(y)
+        self.X = np.column_stack((np.ones(X.shape[0]), X)).astype(np.float64)
+        self.y = np.array(y, dtype=np.float64)
+
         self.W = np.zeros(self.X.shape[1])
         self.l1 = l1
         self.l2 = l2
@@ -28,7 +29,8 @@ class LinearReg:
         elif reg == "l2":
             reg_term = 2 * self.l2 * self.W
         else:
-            reg_term = 0
+            reg_term = np.zeros_like(self.W)
+
         self.W -= lr * (gradient + reg_term)
         
     def train_gd(self, lr, epochs, reg=0):
