@@ -1,134 +1,107 @@
 import numpy as np
 import pandas as pd
+
 class DataProcessor:
-    def __init__(self, df):
+    def __init__(self, df, config=None):
         self.df = df
         self.mean_std = []
+        self.config = config or {
+            "clean_columns": True,
+            "fix_brand_typos": True,
+            "convert_price": True,
+            "calc_antiguedad": True,
+            "convert_km": True,
+            "one_hot_encode": True,
+            "drop_low_info": True,
+            "parse_motor": True,
+            "group_transmission": True,
+            "encode_vendedor": True,
+            "group_combustible": True
+        }
 
     def preprocess(self):
         df = self.df.copy()
 
         # 1. Limpieza básica
-        df_clean = df.drop(columns=["Unnamed: 0", "Título", "Descripción"], errors="ignore")
+        if self.config["clean_columns"]:
+            df = df.drop(columns=["Unnamed: 0", "Título", "Descripción"], errors="ignore")
 
-        # 2. Precio en USD
-        usd_conversion_rate = 1185.26
-        df_clean["Precio_usd"] = np.where(
-            df_clean["Moneda"] == "$",
-            df_clean["Precio"] / usd_conversion_rate,
-            df_clean["Precio"]
-        )
-        df_clean = df_clean.drop(columns=["Precio", "Moneda"], errors="ignore")
+        # 2. Arreglar marcas mal escritas
+        if self.config["fix_brand_typos"]:
+            df["Marca"] = df["Marca"].replace({
+                "Hiunday": "Hyundai",
+                "hiunday": "Hyundai",
+                "Rrenault": "Renault",
+                "Jetur": "Jetour",
+                "Vol": "Volvo"
+            })
 
-        # 3. Antigüedad
-        df_clean["Antigüedad"] = 2025 - df_clean["Año"]
-        df_clean = df_clean.drop(columns=["Año"], errors="ignore")
+        # 3. Precio a USD
+        if self.config["convert_price"]:
+            usd_conversion_rate = 1185.26
+            df["Precio_usd"] = np.where(df["Moneda"] == "$", df["Precio"] / usd_conversion_rate, df["Precio"])
+            df = df.drop(columns=["Precio", "Moneda"], errors="ignore")
 
-        # 4. Kilómetros a número
-        df_clean["Kilómetros"] = (
-            df_clean["Kilómetros"]
-            .astype(str)
-            .str.replace(" km", "", regex=False)
-            .str.replace(".", "", regex=False)
-            .str.replace(",", "", regex=False)
-            .astype(float)
-        )
+        # 4. Antigüedad
+        if self.config["calc_antiguedad"]:
+            df["Antigüedad"] = 2025 - df["Año"]
+            df = df.drop(columns=["Año"], errors="ignore")
 
-        # 6. One-hot encoding (manual)
-        def one_hot_encode(df, column):
-            unique_values = df[column].unique()
-            one_hot = np.zeros((df.shape[0], len(unique_values)), dtype=float)
-            value_to_index = {val: i for i, val in enumerate(unique_values)}
-            for i, val in enumerate(df[column]):
-                one_hot[i, value_to_index[val]] = 1
-            col_names = [f"{column}_{val}" for val in unique_values]
-            one_hot_df = pd.DataFrame(one_hot, columns=col_names, index=df.index)
-            return one_hot_df
+        # 5. Convertir Kilómetros
+        if self.config["convert_km"]:
+            df["Kilómetros"] = (
+                df["Kilómetros"]
+                .astype(str)
+                .str.replace(" km", "", regex=False)
+                .str.replace(".", "", regex=False)
+                .str.replace(",", "", regex=False)
+                .astype(float)
+            )
 
-        columns_to_encode = ["Marca", "Modelo"]
+        # 6. One-hot de Marca y Modelo
+        if self.config["one_hot_encode"]:
+            for col in ["Marca", "Modelo"]:
+                if col in df.columns:
+                    one_hot = pd.get_dummies(df[col], prefix=col)
+                    df = pd.concat([df, one_hot], axis=1)
+                    df = df.drop(columns=[col])
 
-        encoded_parts = []
-        for col in columns_to_encode:
-            if col in df_clean.columns:
-                print(f"{col}: {df_clean[col].nunique()} categorías")
-                encoded = one_hot_encode(df_clean, col)
-                encoded_parts.append(encoded)
+        # 7. Eliminar columnas de poca información
+        if self.config["drop_low_info"]:
+            df = df.drop(columns=["Color", "Con cámara de retroceso", "Versión", "Tipo de carrocería"], errors="ignore")
 
-        # Concatenamos las columnas one-hot al dataset
-        if encoded_parts:
-            df_encoded = pd.concat(encoded_parts, axis=1)
-            df_clean = pd.concat([df_clean, df_encoded], axis=1)
+        # 8. Extraer cilindrada
+        if self.config["parse_motor"]:
+            df["Cilindrada"] = df["Motor"].str.extract(r'(\d\.\d)').astype(float)
+            df.drop(columns=["Motor"], inplace=True)
+            df.dropna(subset=["Cilindrada"], inplace=True)
 
-        # Eliminamos las columnas originales categóricas
-        df_clean = df_clean.drop(columns=columns_to_encode, errors="ignore")
-        encoded = pd.concat(encoded_parts, axis=1) if encoded_parts else pd.DataFrame(index=df_clean.index)
+        # 9. Agrupar transmisiones y binarizar
+        if self.config["group_transmission"]:
+            df["Transmisión"] = df["Transmisión"].replace({
+                "Automática secuencial": "Automática",
+                "Semiautomática": "Automática"
+            })
+            df["Transmisión_Manual"] = (df["Transmisión"] == "Manual").astype(int)
+            df.drop(columns=["Transmisión"], inplace=True)
 
-        # features poco influyentes
-        df_clean = df_clean.drop(columns=["Color", "Con cámara de retroceso","Versión"], errors="ignore")
+        # 10. Vendedor particular
+        if self.config["encode_vendedor"]:
+            df["vendedor_particular"] = (df["Tipo de vendedor"] == "particular").astype(int)
+            df.drop(columns=["Tipo de vendedor"], inplace=True)
 
-        # # 7. Eliminar columnas categóricas originales si existen
-        # df_clean = df_clean.drop(columns=[col for col in columns_to_encode if col in df_clean.columns])
-        # df_clean = df_clean.drop(columns=["Versión", "Moneda"], errors="ignore")
+        # 11. Agrupar combustibles poco comunes
+        if self.config["group_combustible"]:
+            otros = ["GNC", "Eléctrico", "Mild Hybrid", "Híbrido", "Híbrido/Nafta", "Nafta/GNC"]
+            df["Tipo de combustible agrupado"] = df["Tipo de combustible"].apply(
+                lambda x: x if x not in otros else "Otros"
+            )
+            dummies = pd.get_dummies(df["Tipo de combustible agrupado"], prefix="combustible")
+            df = pd.concat([df, dummies], axis=1)
+            df = df.drop(columns=["Tipo de combustible", "Tipo de combustible agrupado"], errors="ignore")
 
-        # # 8. Agregar columnas codificadas
-        # df_clean = pd.concat([df_clean, df_encoded], axis=1)
-        df_clean.loc[df_clean["Marca"] == "Hiunday", "Marca"] = "Hyundai"
-        df_clean.loc[df_clean["Marca"] == "hiunday", "Marca"] = "Hyundai"
-        df_clean.loc[df_clean["Marca"] == "Rrenault", "Marca"] = "Renault"
-        df_clean.loc[df_clean["Marca"] == "Jetur", "Marca"] = "Jetour"
-        df_clean.loc[df_clean["Marca"] == "Vol", "Marca"] = "Volvo"
-        # Cilindrada en ves de motor
-        df_clean['Cilindrada'] = df_clean['Motor'].str.extract(r'(\d\.\d)').astype(float)
-        df_clean = df_clean.drop(columns=["Motor"], errors="ignore")
-        df_clean = df_clean.dropna(subset=["Cilindrada"])
+        return df.reset_index(drop=True)
 
-        # Agrupar las transmisiones menos comunes como "Automática"
-        df_clean["Transmisión"] = df_clean["Transmisión"].replace({
-            "Automática secuencial": "Automática",
-            "Semiautomática": "Automática"
-        })
-        df_clean["Transmisión_Manual"] = (df_clean["Transmisión"] == "Manual").astype(int)
-        df_clean.drop(columns=["Transmisión"], inplace=True)
-        
-        # Convertir "Tipo de vendedor" en binaria: 1 si es particular, 0 si es empresa (concesionaria o tienda)
-        df_clean["vendedor_particular"] = df_clean["Tipo de vendedor"].apply(
-            lambda x: 1 if x == "particular" else 0
-        )
-        df_clean.drop(columns=["Tipo de vendedor"], inplace=True)
-
-        # ya que hay solo un valor (SUV)
-        df_clean.drop(columns=["Tipo de carrocería"], inplace=True)
-
-        # Nafta 
-        otros = ["GNC", "Eléctrico", "Mild Hybrid", "Híbrido", "Híbrido/Nafta", "Nafta/GNC"]
-
-        df_clean["Tipo de combustible agrupado"] = df_clean["Tipo de combustible"].apply(
-            lambda x: x if x not in otros else "Otros"
-        )
-        # Ahora hacemos one-hot encoding
-        df_encoded = pd.get_dummies(df_clean["Tipo de combustible agrupado"], prefix="combustible")
-        df_clean = pd.concat([df_clean, df_encoded], axis=1)
-        df_clean.drop(columns=["Tipo de combustible", "Tipo de combustible agrupado"], inplace=True)
-
-        # Marcas
-        # alta = {"BMW", "Mercedes-Benz", "Audi", "Lexus", "Volvo", "Land Rover"}
-        # media = {"Toyota", "Honda", "Volkswagen", "Hyundai", "Nissan", "Chevrolet", "Ford", "Renault"}
-        # baja = {"Fiat", "Chery", "Peugeot", "Jetour", "JAC", "Lifan"}
-
-        # def clasificar_marca(marca):
-        #     if marca in alta:
-        #         return "alta"
-        #     elif marca in media:
-        #         return "media"
-        #     else:
-        #         return "baja"
-
-        # df["Gama_marca"] = df["Marca"].apply(clasificar_marca)
-
-
-
-        return df_clean.reset_index(drop=True)
-            
 
     def normalize(self, X):
         for i in range(X.shape[1]):

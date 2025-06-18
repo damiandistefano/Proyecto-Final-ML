@@ -45,10 +45,4 @@ class LinearReg:
     def predict(self, X):
         X = np.column_stack((np.ones(X.shape[0]), X))
         return X @ self.W
-    def mean_squared_error(self, y_true, y_pred):
-        mse = np.mean((y_true - y_pred) ** 2)
-        return mse
-    
-    def rmse(self, y_true, y_pred):
-        return np.sqrt(self.mean_squared_error(y_true, y_pred))
 
