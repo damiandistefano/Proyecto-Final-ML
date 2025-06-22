@@ -19,7 +19,7 @@ def exploratory_analysis(df, target_col):
     print(df[target_col].value_counts(normalize=True))
 
 
-def box_plot_features(df, target_col='Precio_usd'):
+def box_plot_features(df, target_col='Precio'):
     
     # Seleccionar columnas numéricas excluyendo target y variables dummy
     numeric_cols = df.select_dtypes(include=[np.number]).columns
