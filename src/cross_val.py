@@ -87,7 +87,7 @@ def tune_and_test_rf(
 
     Retorna un diccionario con resultados y mejores parámetros.
     """
-    resultados = []
+   
 
     # Separar en trainval y test
     df_trainval, df_test = train_test_split(df, test_size=test_size, random_state=random_state)
@@ -131,11 +131,22 @@ def tune_and_test_rf(
             best_test_rmse = rmse_test
             best_final_params = params
 
-    resultados.append({
+    return {
         "best_params_val": best_params,
         "val_rmse": min(score for _, score in scores),
         "best_params_test": best_final_params,
         "test_rmse": best_test_rmse
-    })
+        }
 
-    return resultados
+def analyze_datasets_performance(datasets_explorations, param_grid, resultados):
+    for nombre, dataset in datasets_explorations:
+        print(f"\nEvaluando dataset: {nombre}")
+        res = tune_and_test_rf(dataset, target_col="Precio_usd", param_grid=param_grid, top_n=3)
+        print(res)
+        resultados.append({
+    "dataset": nombre,
+    "best_params_val": res["best_params_val"],
+    "val_rmse": res["val_rmse"],
+    "best_params_test": res["best_params_test"],
+    "test_rmse": res["test_rmse"]
+})
