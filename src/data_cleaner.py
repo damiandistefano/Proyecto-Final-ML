@@ -5,10 +5,10 @@ class DataProcessor:
     def __init__(self, df, config=None):
         self.df = df
         self.mean_std = []
-        self.y_mean= None
+        self.y_mean = None
         self.y_std = None
 
-        self.config = config or {
+        default_config = {
             "clean_columns": True,
             "fix_brand_typos": True,
             "convert_price": True,
@@ -19,8 +19,16 @@ class DataProcessor:
             "parse_motor": True,
             "group_transmission": True,
             "encode_vendedor": True,
-            "group_combustible": True
+            "group_combustible": True,
+            "add_precio_por_km": False,
+            "add_antiguedad_squared": False,
+            "add_cilindrada_times_km": False,
+            "add_frecuencia_features": False
         }
+
+        self.config = default_config.copy()
+        if config:
+            self.config.update(config)
 
     def preprocess(self):
         df = self.df.copy()
@@ -30,7 +38,7 @@ class DataProcessor:
             df = df.drop(columns=["Unnamed: 0", "Título", "Descripción"], errors="ignore")
 
         # 2. Arreglar marcas mal escritas
-        if self.config["fix_brand_typos"]:
+        if self.config["fix_brand_typos"] and "Marca" in df.columns:
             df["Marca"] = df["Marca"].replace({
                 "Hiunday": "Hyundai",
                 "hiunday": "Hyundai",
@@ -38,6 +46,7 @@ class DataProcessor:
                 "Jetur": "Jetour",
                 "Vol": "Volvo"
             })
+
 
         # 3. Precio a USD
         if self.config["convert_price"]:
@@ -87,6 +96,11 @@ class DataProcessor:
             })
             df["Transmisión_Manual"] = (df["Transmisión"] == "Manual").astype(int)
             df.drop(columns=["Transmisión"], inplace=True)
+        elif self.config["group_transmission"] is False:
+            # Si no se agrupan, hacemos one-hot de transmisión directamente
+            dummies = pd.get_dummies(df["Transmisión"], prefix="transmision")
+            df = pd.concat([df, dummies], axis=1)
+            df.drop(columns=["Transmisión"], inplace=True)  # 👈 faltaba esto
 
         # 10. Vendedor particular
         if self.config["encode_vendedor"]:
@@ -102,6 +116,36 @@ class DataProcessor:
             dummies = pd.get_dummies(df["Tipo de combustible agrupado"], prefix="combustible")
             df = pd.concat([df, dummies], axis=1)
             df = df.drop(columns=["Tipo de combustible", "Tipo de combustible agrupado"], errors="ignore")
+
+        elif self.config["group_combustible"] is False:
+            # Si no se agrupan, hacemos one-hot de combustible directamente
+            dummies = pd.get_dummies(df["Tipo de combustible"], prefix="combustible")
+            df = pd.concat([df, dummies], axis=1)
+            df = df.drop(columns=["Tipo de combustible"], errors="ignore")
+        
+        # 12. Precio por kilómetro
+        if self.config.get("add_precio_por_km", False) and "Precio_usd" in df.columns and "Kilómetros" in df.columns:
+            df["precio_por_km"] = df["Precio_usd"] / (df["Kilómetros"] + 1)  # +1 para evitar división por cero
+
+        # 13. Antigüedad al cuadrado
+        if self.config.get("add_antiguedad_squared", False) and "Antigüedad" in df.columns:
+            df["antiguedad_squared"] = df["Antigüedad"] ** 2
+
+        # 14. Interacciones entre variables
+        if self.config.get("add_cilindrada_times_km", False):
+            if "Cilindrada" in df.columns and "Kilómetros" in df.columns:
+                df["cilindrada_x_km"] = df["Cilindrada"] * df["Kilómetros"]
+
+        # 15. Rareza de marca y modelo
+        if self.config.get("add_frecuencia_features", False):
+            if "Marca" in self.df.columns:
+                freq_marca = self.df["Marca"].value_counts(normalize=True)
+                df["frecuencia_marca"] = self.df["Marca"].map(freq_marca)
+
+            if "Modelo" in self.df.columns:
+                freq_modelo = self.df["Modelo"].value_counts(normalize=True)
+                df["frecuencia_modelo"] = self.df["Modelo"].map(freq_modelo)
+
 
         return df.reset_index(drop=True)
 
