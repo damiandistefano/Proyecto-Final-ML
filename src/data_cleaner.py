@@ -23,7 +23,8 @@ class DataProcessor:
             "add_precio_por_km": False,
             "add_antiguedad_squared": False,
             "add_cilindrada_times_km": False,
-            "add_frecuencia_features": False
+            "add_frecuencia_features": False,
+            "outlaier_group": True,
         }
 
         self.config = default_config.copy()
@@ -69,7 +70,14 @@ class DataProcessor:
                 .str.replace(",", "", regex=False)
                 .astype(float)
             )
+        if self.config["outlaier_group"]:
+            min_freq = 0.01  # porcentaje mínimo requerido
 
+            for col in ["Marca", "Modelo"]:
+                if col in df.columns:
+                    freq = df[col].value_counts(normalize=True)
+                    frecuentes = freq[freq >= min_freq].index
+                    df[col] = df[col].apply(lambda x: x if x in frecuentes else f"{col}_Otros")
         # 6. One-hot de Marca y Modelo
         if self.config["one_hot_encode"]:
             for col in ["Marca", "Modelo"]:
