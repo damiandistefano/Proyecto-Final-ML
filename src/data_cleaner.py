@@ -25,6 +25,7 @@ class DataProcessor:
             "add_cilindrada_times_km": False,
             "add_frecuencia_features": False,
             "outlaier_group": True,
+            "limpieza_de_outliers": True
         }
 
         self.config = default_config.copy()
@@ -73,11 +74,53 @@ class DataProcessor:
         if self.config["outlaier_group"]:
             min_freq = 0.01  # porcentaje mínimo requerido
 
-            for col in ["Marca", "Modelo"]:
+            for col in ["Marca"]:
                 if col in df.columns:
                     freq = df[col].value_counts(normalize=True)
                     frecuentes = freq[freq >= min_freq].index
                     df[col] = df[col].apply(lambda x: x if x in frecuentes else f"{col}_Otros")
+        # 16. Limpieza de outliers
+        if self.config.get("limpieza_de_outliers", True):
+            df_clean = df.copy()
+            inicial = len(df_clean)
+
+            # Regla dura: antigüedad negativa
+            df_clean = df_clean[df_clean['Antigüedad'] >= 0]
+
+            # Regla dura: kilómetros y cilindrada no negativas ni cero
+            df_clean = df_clean[df_clean['Kilómetros'] >= 0]
+
+
+            # Regla estadística: eliminar outliers por IQR en km
+            q1 = df_clean['Kilómetros'].quantile(0.25)
+            q3 = df_clean['Kilómetros'].quantile(0.75)
+            iqr = q3 - q1
+            lim_inf = q1 - 1.5 * iqr
+            lim_sup = q3 + 1.5 * iqr
+            df_clean = df_clean[(df_clean['Kilómetros'] >= lim_inf) & (df_clean['Kilómetros'] <= lim_sup)]
+
+            # Regla estadística: antigüedad extrema
+            q1 = df_clean['Antigüedad'].quantile(0.25)
+            q3 = df_clean['Antigüedad'].quantile(0.75)
+            iqr = q3 - q1
+            lim_inf = q1 - 1.5 * iqr
+            lim_sup = q3 + 1.5 * iqr
+            df_clean = df_clean[(df_clean['Antigüedad'] >= lim_inf) & (df_clean['Antigüedad'] <= lim_sup)]
+
+            # Regla: demasiados "Marca_Otros" o "Modelo" raro
+            umbral = 0.01  # 1%
+            marcas_freq = df_clean['Marca'].value_counts(normalize=True)
+            modelos_freq = df_clean['Modelo'].value_counts(normalize=True)
+            marcas_validas = marcas_freq[marcas_freq >= umbral].index
+            modelos_validos = modelos_freq[modelos_freq >= umbral].index
+            df_clean = df_clean[df_clean['Marca'].isin(marcas_validas)]
+            df_clean = df_clean[df_clean['Modelo'].isin(modelos_validos)]
+
+            # Eliminar duplicados exactos
+            df_clean = df_clean.drop_duplicates()
+
+            print(f"Filas iniciales: {inicial} → después del filtrado: {len(df_clean)}")
+            df = df_clean
         # 6. One-hot de Marca y Modelo
         if self.config["one_hot_encode"]:
             for col in ["Marca", "Modelo"]:
@@ -154,7 +197,7 @@ class DataProcessor:
                 freq_modelo = self.df["Modelo"].value_counts(normalize=True)
                 df["frecuencia_modelo"] = self.df["Modelo"].map(freq_modelo)
 
-
+        df = df.astype(float)  # Asegurar que todo sea float para evitar problemas de tipo
         return df.reset_index(drop=True)
 
 
