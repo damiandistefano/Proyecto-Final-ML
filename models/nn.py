@@ -13,9 +13,9 @@ class NeuralNetwork:
         self.hidden_layers = hidden_layers
         self.optimizer_name = optimizer_name
         self.learning_rate = learning_rate
-        self.model = self._build_model()
+        self.model = self.build_model()
     
-    def _build_optimizer(self):
+    def build_optimizer(self):
         if self.optimizer_name.lower() == 'adam':
             return keras.optimizers.Adam(learning_rate=self.learning_rate)
         elif self.optimizer_name.lower() == 'rmsprop':
@@ -23,7 +23,7 @@ class NeuralNetwork:
         else:
             raise ValueError(f"Unsupported optimizer: {self.optimizer_name}")
 
-    def _build_model(self):
+    def build_model(self):
         model = keras.Sequential()
         model.add(layers.Input(shape=(self.input_dim,)))
 
@@ -32,7 +32,7 @@ class NeuralNetwork:
 
         model.add(layers.Dense(1))
 
-        optimizer = self._build_optimizer()
+        optimizer = self.build_optimizer()
         model.compile(optimizer=optimizer, loss='mse', metrics=['mse', 'mae'])
         return model
 
@@ -70,57 +70,7 @@ class NeuralNetwork:
         return self.model.evaluate(X_test, y_test, verbose=0)
 
 
-# def cross_validate_nn(X, y, param_grid, input_dim, epochs=50, batch_size=32, k=3):
-#     results = []
-#     # columns = X.columns
-#     X_np = X.to_numpy()
-#     y_np = y.to_numpy()
 
-#     # Generar todas las combinaciones posibles de hiperparámetros
-#     all_params = list(itertools.product(
-#         param_grid['hidden_layers'],
-#         param_grid['optimizer'],
-#         param_grid['learning_rate']
-#     ))
-
-#     for hidden_layers, optimizer, lr in all_params:
-#         print(f"Evaluando: layers={hidden_layers}, optimizer={optimizer}, lr={lr}")
-#         fold_mse = []
-
-#         kf = KFold(n_splits=k, shuffle=True, random_state=42)
-
-#         for train_index, val_index in kf.split(X):
-#             X_train_raw, X_val_raw = X_np[train_index], X_np[val_index]
-#             y_train, y_val = y_np[train_index], y_np[val_index]
-
-#             dp = DataProcessor(df=None)  
-#             X_train = dp.normalize(X_train_raw.copy())
-#             X_val = dp.normalize_new_data(X_val_raw.copy())
-
-#             # Crear y entrenar modelo
-#             nn = NeuralNetwork(input_dim=input_dim,
-#                                hidden_layers=hidden_layers,
-#                                optimizer_name=optimizer,
-#                                learning_rate=lr)
-#             nn.fit(X_train, y_train,
-#                 epochs=epochs,
-#                 batch_size=batch_size,
-#                 validation_data=(X_val, y_val))
-
-#             # Evaluar
-#             y_pred = nn.predict(X_val)
-#             mse = mean_squared_error(y_val, y_pred)
-#             fold_mse.append(mse)
-
-#         avg_mse = np.mean(fold_mse)
-#         results.append({
-#             'hidden_layers': hidden_layers,
-#             'optimizer': optimizer,
-#             'learning_rate': lr,
-#             'avg_val_mse': avg_mse
-#         })
-
-#     return results
 def cross_validate_nn(X, y, param_grid, input_dim, epochs=50, batch_size=32, k=3):
     results = []
     X_np = X.to_numpy()

@@ -24,7 +24,7 @@ class DataProcessor:
             "add_antiguedad_squared": False,
             "add_cilindrada_times_km": False,
             "add_frecuencia_features": False,
-            "outlaier_group": True,
+            "outlaier_group": False,
             "limpieza_de_outliers": True
         }
 
@@ -71,14 +71,16 @@ class DataProcessor:
                 .str.replace(",", "", regex=False)
                 .astype(float)
             )
+        # para hacer en el test y que no elimine los outliers
         if self.config["outlaier_group"]:
-            min_freq = 0.01  # porcentaje mínimo requerido
-
+            umbral = 0.01 
+            # modelo
             for col in ["Marca"]:
                 if col in df.columns:
                     freq = df[col].value_counts(normalize=True)
-                    frecuentes = freq[freq >= min_freq].index
+                    frecuentes = freq[freq >= umbral].index
                     df[col] = df[col].apply(lambda x: x if x in frecuentes else f"{col}_Otros")
+
         # 16. Limpieza de outliers
         if self.config.get("limpieza_de_outliers", True):
             df_clean = df.copy()
@@ -100,18 +102,10 @@ class DataProcessor:
             q1 = df_clean['Antigüedad'].quantile(0.25)
             q3 = df_clean['Antigüedad'].quantile(0.75)
             iqr = q3 - q1
-            lim_inf = q1 - 1.5 * iqr
-            lim_sup = q3 + 1.5 * iqr
+            lim_inf = q1 - 2.5 * iqr
+            lim_sup = q3 + 2.5 * iqr
             df_clean = df_clean[(df_clean['Antigüedad'] >= lim_inf) & (df_clean['Antigüedad'] <= lim_sup)]
             
-            umbral = 0.01  
-            marcas_freq = df_clean['Marca'].value_counts(normalize=True)
-            modelos_freq = df_clean['Modelo'].value_counts(normalize=True)
-            marcas_validas = marcas_freq[marcas_freq >= umbral].index
-            modelos_validos = modelos_freq[modelos_freq >= umbral].index
-            df_clean = df_clean[df_clean['Marca'].isin(marcas_validas)]
-            df_clean = df_clean[df_clean['Modelo'].isin(modelos_validos)]
-
             # Eliminar duplicados exactos
             df_clean = df_clean.drop_duplicates()
 
