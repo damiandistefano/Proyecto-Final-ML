@@ -84,14 +84,12 @@ class DataProcessor:
             df_clean = df.copy()
             inicial = len(df_clean)
 
-            # Regla dura: antigüedad negativa
+
             df_clean = df_clean[df_clean['Antigüedad'] >= 0]
 
-            # Regla dura: kilómetros y cilindrada no negativas ni cero
             df_clean = df_clean[df_clean['Kilómetros'] >= 0]
 
 
-            # Regla estadística: eliminar outliers por IQR en km
             q1 = df_clean['Kilómetros'].quantile(0.25)
             q3 = df_clean['Kilómetros'].quantile(0.75)
             iqr = q3 - q1
@@ -99,16 +97,14 @@ class DataProcessor:
             lim_sup = q3 + 1.5 * iqr
             df_clean = df_clean[(df_clean['Kilómetros'] >= lim_inf) & (df_clean['Kilómetros'] <= lim_sup)]
 
-            # Regla estadística: antigüedad extrema
             q1 = df_clean['Antigüedad'].quantile(0.25)
             q3 = df_clean['Antigüedad'].quantile(0.75)
             iqr = q3 - q1
             lim_inf = q1 - 1.5 * iqr
             lim_sup = q3 + 1.5 * iqr
             df_clean = df_clean[(df_clean['Antigüedad'] >= lim_inf) & (df_clean['Antigüedad'] <= lim_sup)]
-
-            # Regla: demasiados "Marca_Otros" o "Modelo" raro
-            umbral = 0.01  # 1%
+            
+            umbral = 0.01  
             marcas_freq = df_clean['Marca'].value_counts(normalize=True)
             modelos_freq = df_clean['Modelo'].value_counts(normalize=True)
             marcas_validas = marcas_freq[marcas_freq >= umbral].index
