@@ -138,15 +138,29 @@ def tune_and_test_rf(
         "test_rmse": best_test_rmse
         }
 
-def analyze_datasets_performance(datasets_explorations, param_grid, resultados):
+param_grid = {
+    "n_trees": [20, 50,100,200],             
+    "max_depth": [5, 20, 50,None],         
+    "min_samples_split": [2, 5, 10],        
+    "max_features": [5,20, "sqrt", "log2"] 
+}
+def evaluate_datasets(resultados_final, datasets_explorations):
     for nombre, dataset in datasets_explorations:
-        print(f"\nEvaluando dataset: {nombre}")
+        print(f"\n📊 Evaluando dataset: {nombre}")
         res = tune_and_test_rf(dataset, target_col="Precio_usd", param_grid=param_grid, top_n=3)
         print(res)
-        resultados.append({
+        resultados_final.append({
     "dataset": nombre,
     "best_params_val": res["best_params_val"],
     "val_rmse": res["val_rmse"],
     "best_params_test": res["best_params_test"],
     "test_rmse": res["test_rmse"]
 })
+        
+def show_validation_results(df_resultados):
+    for _, row in df_resultados.iterrows():
+        print(f"\n📌 Dataset: {row['dataset']}")
+        print(f"🔧 Best Val Params:  {row['best_params_val']}")
+        print(f"📉 Val RMSE:         {row['val_rmse']:.2f}")
+        print(f"🏆 Best Test Params: {row['best_params_test']}")
+        print(f"🧪 Test RMSE:        {row['test_rmse']:.2f}")

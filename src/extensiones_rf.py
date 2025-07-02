@@ -116,6 +116,6 @@ def plot_top_subvaluados(top_relativo):
 def top_autos_subvaluados(df_pred, top_n=10):
     return df_pred.sort_values(by="delta_%").head(top_n)[[
         "Marca", "Modelo", "Antigüedad", "Kilómetros", "Cilindrada", 
-        "Transmisión", "Combustible", "Vendedor", 
-        "precio_predicho", "Precio_usd", "delta_%"
+         "Vendedor", "precio_predicho", "Precio_usd", "delta_%"
     ]]
+
