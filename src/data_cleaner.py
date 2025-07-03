@@ -118,7 +118,7 @@ class DataProcessor:
 
         if "group_combustible" in self.config:
             if self.config["group_combustible"]:
-                otros = ["GNC", "Eléctrico", "Mild Hybrid", "Híbrido", "Híbrido/Nafta", "Nafta/GNC"]
+                otros = ["GNC", "Eléctrico", "Mild Hybrid", "Híbrido", "Híbrido/Nafta", "Nafta/GNC", "Híbrido/Diesel"]
                 df["Tipo de combustible agrupado"] = df["Tipo de combustible"].apply(
                     lambda x: x if x not in otros else "Otros"
                 )
