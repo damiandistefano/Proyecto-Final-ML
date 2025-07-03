@@ -71,16 +71,80 @@ class NeuralNetwork:
         return self.model.evaluate(X_test, y_test, verbose=0)
 
 
-def cross_validate_nn(X, y, param_grid, epochs=50, batch_size=32, k=3):
+# def cross_validate_nn(X, y, param_grid, epochs=50, batch_size=32, k=3):
+#     results = []
+
+#     indices = np.arange(len(X))
+#     X = X.iloc[indices]
+#     y = y.iloc[indices]
+
+#     # Creamos los índices para los folds
+#     fold_sizes = np.full(k, len(X) // k)
+#     fold_sizes[:len(X) % k] += 1
+#     current = 0
+#     folds = []
+#     for fold_size in fold_sizes:
+#         start, stop = current, current + fold_size
+#         folds.append((start, stop))
+#         current = stop
+
+#     all_params = list(itertools.product(
+#         param_grid['hidden_layers'],
+#         param_grid['optimizer'],
+#         param_grid['learning_rate']
+#     ))
+
+#     for hidden_layers, optimizer, lr in all_params:
+#         print(f"Evaluando: layers={hidden_layers}, optimizer={optimizer}, lr={lr}")
+#         fold_mse = []
+
+#         for i in range(k):
+#             val_start, val_end = folds[i]
+#             X_val_raw = X.iloc[val_start:val_end]
+#             y_val = y.iloc[val_start:val_end]
+
+#             X_train_raw = pd.concat([X.iloc[:val_start], X.iloc[val_end:]])
+#             y_train = pd.concat([y.iloc[:val_start], y.iloc[val_end:]])
+
+#             dp = DataProcessor(df=X_train_raw)
+#             X_train = dp.preprocess_split().to_numpy()
+#             X_val = dp.preprocess_new_data(X_val_raw).to_numpy()
+
+#             X_train = dp.normalize(X_train.copy())
+#             X_val = dp.normalize_new_data(X_val.copy())
+
+#             input_dim = X_train.shape[1]
+#             nn = NeuralNetwork(input_dim=input_dim,
+#                                hidden_layers=hidden_layers,
+#                                optimizer_name=optimizer,
+#                                learning_rate=lr)
+#             nn.fit(X_train, y_train,
+#                    epochs=epochs,
+#                    batch_size=batch_size,
+#                    validation_data=(X_val, y_val))
+
+#             y_pred = nn.predict(X_val)
+#             mse = mean_squared_error(y_val, y_pred)
+#             fold_mse.append(mse)
+
+#         avg_mse = np.mean(fold_mse)
+#         results.append({
+#             'hidden_layers': hidden_layers,
+#             'optimizer': optimizer,
+#             'learning_rate': lr,
+#             'avg_val_mse': avg_mse
+#         })
+
+#     return results
+
+def cross_validate_nn(df, param_grid, epochs=50, batch_size=32, k=3):
     results = []
 
-    indices = np.arange(len(X))
-    X = X.iloc[indices]
-    y = y.iloc[indices]
+    df = df.sample(frac=1).reset_index(drop=True)  # Shuffle
 
     # Creamos los índices para los folds
-    fold_sizes = np.full(k, len(X) // k)
-    fold_sizes[:len(X) % k] += 1
+    fold_sizes = np.full(k, len(df) // k)
+    fold_sizes[:len(df) % k] += 1
     current = 0
     folds = []
     for fold_size in fold_sizes:
@@ -100,16 +164,21 @@ def cross_validate_nn(X, y, param_grid, epochs=50, batch_size=32, k=3):
 
         for i in range(k):
             val_start, val_end = folds[i]
-            X_val_raw = X.iloc[val_start:val_end]
-            y_val = y.iloc[val_start:val_end]
+            df_val_raw = df.iloc[val_start:val_end]
+            df_train_raw = pd.concat([df.iloc[:val_start], df.iloc[val_end:]])
 
-            X_train_raw = pd.concat([X.iloc[:val_start], X.iloc[val_end:]])
-            y_train = pd.concat([y.iloc[:val_start], y.iloc[val_end:]])
+            dp = DataProcessor(df=df_train_raw)
+            df_train_processed = dp.preprocess_split()  # Solo features
+            df_val_processed = dp.preprocess_new_data(df_val_raw)
 
-            dp = DataProcessor(df=X_train_raw)
-            X_train = dp.preprocess_split().to_numpy()
-            X_val = dp.preprocess_new_data(X_val_raw).to_numpy()
+            # Separar X e y (por ejemplo "Precio_usd" como target)
+            y_train = df_train_processed["Precio_usd"].to_numpy()
+            X_train = df_train_processed.drop(columns=["Precio_usd"]).to_numpy()
 
+            y_val = df_val_processed["Precio_usd"].to_numpy()
+            X_val = df_val_processed.drop(columns=["Precio_usd"]).to_numpy()
+
+            # Normalizar
             X_train = dp.normalize(X_train.copy())
             X_val = dp.normalize_new_data(X_val.copy())
 
@@ -136,3 +205,4 @@ def cross_validate_nn(X, y, param_grid, epochs=50, batch_size=32, k=3):
         })
 
     return results
+
