@@ -6,6 +6,7 @@ from sklearn.metrics import mean_squared_error
 import itertools
 import numpy as np
 from src.data_cleaner import DataProcessor
+import pandas as pd
 
 class NeuralNetwork:
     def __init__(self, input_dim, hidden_layers=[64, 32], optimizer_name='adam', learning_rate=0.001):
@@ -71,18 +72,84 @@ class NeuralNetwork:
 
 
 
-def cross_validate_nn(X, y, param_grid, input_dim, epochs=50, batch_size=32, k=3):
-    results = []
-    X_np = X.to_numpy()
-    y_np = y.to_numpy()
+# def cross_validate_nn(X, y, param_grid, epochs=50, batch_size=32, k=3):
+#     results = []
+#     X_np = X.to_numpy()
+#     y_np = y.to_numpy()
 
-    indices = np.arange(len(X_np))
-    X_np = X_np[indices]
-    y_np = y_np[indices]
+#     indices = np.arange(len(X_np))
+#     X_np = X_np[indices]
+#     y_np = y_np[indices]
+
+#     # Creamos los índices para los folds
+#     fold_sizes = np.full(k, len(X_np) // k)
+#     fold_sizes[:len(X_np) % k] += 1  # Distribuir sobrantes
+#     current = 0
+#     folds = []
+#     for fold_size in fold_sizes:
+#         start, stop = current, current + fold_size
+#         folds.append((start, stop))
+#         current = stop
+
+#     # Generar todas las combinaciones de hiperparámetros
+#     all_params = list(itertools.product(
+#         param_grid['hidden_layers'],
+#         param_grid['optimizer'],
+#         param_grid['learning_rate']
+#     ))
+
+#     for hidden_layers, optimizer, lr in all_params:
+#         print(f"Evaluando: layers={hidden_layers}, optimizer={optimizer}, lr={lr}")
+#         fold_mse = []
+
+#         for i in range(k):
+#             val_start, val_end = folds[i]
+#             X_val_raw = X_np[val_start:val_end]
+#             y_val = y_np[val_start:val_end]
+
+#             X_train_raw = np.concatenate([X_np[:val_start], X_np[val_end:]])
+#             y_train = np.concatenate([y_np[:val_start], y_np[val_end:]])
+
+#             dp = DataProcessor(df=X_train_raw)
+#             X_train = dp.preprocess_split().to_numpy()
+#             X_val = dp.preprocess_new_data(X_val_raw).to_numpy()
+            
+#             X_train = dp.normalize(X_train.copy())
+#             X_val = dp.normalize_new_data(X_val_raw.copy())
+#             input_dim = X_train.shape[1]
+#             nn = NeuralNetwork(input_dim=input_dim,
+#                                hidden_layers=hidden_layers,
+#                                optimizer_name=optimizer,
+#                                learning_rate=lr)
+#             nn.fit(X_train, y_train,
+#                    epochs=epochs,
+#                    batch_size=batch_size,
+#                    validation_data=(X_val, y_val))
+
+#             y_pred = nn.predict(X_val)
+#             mse = mean_squared_error(y_val, y_pred)
+#             fold_mse.append(mse)
+
+#         avg_mse = np.mean(fold_mse)
+#         results.append({
+#             'hidden_layers': hidden_layers,
+#             'optimizer': optimizer,
+#             'learning_rate': lr,
+#             'avg_val_mse': avg_mse
+#         })
+
+#     return results
+
+def cross_validate_nn(X, y, param_grid, epochs=50, batch_size=32, k=3):
+    results = []
+
+    indices = np.arange(len(X))
+    X = X.iloc[indices]
+    y = y.iloc[indices]
 
     # Creamos los índices para los folds
-    fold_sizes = np.full(k, len(X_np) // k)
-    fold_sizes[:len(X_np) % k] += 1  # Distribuir sobrantes
+    fold_sizes = np.full(k, len(X) // k)
+    fold_sizes[:len(X) % k] += 1
     current = 0
     folds = []
     for fold_size in fold_sizes:
@@ -90,7 +157,6 @@ def cross_validate_nn(X, y, param_grid, input_dim, epochs=50, batch_size=32, k=3
         folds.append((start, stop))
         current = stop
 
-    # Generar todas las combinaciones de hiperparámetros
     all_params = list(itertools.product(
         param_grid['hidden_layers'],
         param_grid['optimizer'],
@@ -103,16 +169,20 @@ def cross_validate_nn(X, y, param_grid, input_dim, epochs=50, batch_size=32, k=3
 
         for i in range(k):
             val_start, val_end = folds[i]
-            X_val_raw = X_np[val_start:val_end]
-            y_val = y_np[val_start:val_end]
+            X_val_raw = X.iloc[val_start:val_end]
+            y_val = y.iloc[val_start:val_end]
 
-            X_train_raw = np.concatenate([X_np[:val_start], X_np[val_end:]])
-            y_train = np.concatenate([y_np[:val_start], y_np[val_end:]])
+            X_train_raw = pd.concat([X.iloc[:val_start], X.iloc[val_end:]])
+            y_train = pd.concat([y.iloc[:val_start], y.iloc[val_end:]])
 
-            dp = DataProcessor(df=None)
-            X_train = dp.normalize(X_train_raw.copy())
-            X_val = dp.normalize_new_data(X_val_raw.copy())
+            dp = DataProcessor(df=X_train_raw)
+            X_train = dp.preprocess_split().to_numpy()
+            X_val = dp.preprocess_new_data(X_val_raw).to_numpy()
 
+            X_train = dp.normalize(X_train.copy())
+            X_val = dp.normalize_new_data(X_val.copy())
+
+            input_dim = X_train.shape[1]
             nn = NeuralNetwork(input_dim=input_dim,
                                hidden_layers=hidden_layers,
                                optimizer_name=optimizer,
